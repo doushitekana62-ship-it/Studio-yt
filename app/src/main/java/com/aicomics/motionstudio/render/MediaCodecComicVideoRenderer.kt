@@ -80,15 +80,12 @@ class MediaCodecComicVideoRenderer(
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             }
 
-            encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            inputSurface = encoder.createInputSurface()
-            muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            encoder.start()
-            egl = EglVideoSurface(inputSurface, request.outputWidth, request.outputHeight)
-            val gl = egl
-            val mux = muxer
-            val codec = encoder
+            val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { encoder = it }
+            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            val encoderSurface = codec.createInputSurface().also { inputSurface = it }
+            val mux = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).also { muxer = it }
+            codec.start()
+            val gl = EglVideoSurface(encoderSurface, request.outputWidth, request.outputHeight).also { egl = it }
 
             onProgress(RenderProgress(RenderStage.RENDERING_VIDEO, 0, totalFrames, "Rendering comic motion frames"))
 
