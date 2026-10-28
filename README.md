@@ -13,7 +13,8 @@ This repository currently contains the initial application scaffold:
 - Timeline validation for gaps, overlaps, invalid ranges, total duration, and aspect ratio.
 - Deterministic comic-panel placeholder artwork drawn locally with Android Canvas.
 - GLES camera pan/zoom/shake transforms and H.264 MP4 video-only export through Android MediaCodec/MediaMuxer.
-- Export progress callbacks and unit tests for timeline and motion math.
+- Render progress reporting, cancellation, subtitle/dialogue-bubble toggle, Save As via Android system file picker, and Android Sharesheet integration.
+- Unit tests for timeline and motion math.
 
 **Important:** the storyboard generator is a deterministic template system, not an LLM. The current renderer creates stylized placeholder panels from text, not AI artwork. MP4 export is video-only; audio tracks, TTS, SFX/music mixing, project persistence, and real AI model runtimes are not integrated. Export can be saved through Android's system file picker or shared via Sharesheet. The Android encoder pipeline still requires device-level playback testing.
 
