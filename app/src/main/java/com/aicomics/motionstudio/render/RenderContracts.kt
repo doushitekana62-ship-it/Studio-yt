@@ -42,7 +42,7 @@ data class RenderRequest(
     val outputHeight: Int = 1280,
     val framesPerSecond: Int = 24,
     val includeSubtitles: Boolean = true,
-    val includeAudio: Boolean = true
+    val includeAudio: Boolean = false
 )
 
 sealed interface RenderResult {
