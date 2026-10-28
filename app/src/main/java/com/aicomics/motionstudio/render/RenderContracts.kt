@@ -1,6 +1,7 @@
 package com.aicomics.motionstudio.render
 
 import com.aicomics.motionstudio.storyboard.Storyboard
+import java.io.File
 
 enum class RenderStage {
     VALIDATING,
@@ -42,7 +43,8 @@ data class RenderRequest(
     val outputHeight: Int = 1280,
     val framesPerSecond: Int = 24,
     val includeSubtitles: Boolean = true,
-    val includeAudio: Boolean = false
+    val includeAudio: Boolean = false,
+    val audioSourceFile: File? = null
 )
 
 sealed interface RenderResult {
