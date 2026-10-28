@@ -14,7 +14,8 @@ This repository currently contains the initial application scaffold:
 - Deterministic comic-panel placeholder artwork drawn locally with Android Canvas.
 - GLES camera pan/zoom/shake transforms and H.264 MP4 video-only export through Android MediaCodec/MediaMuxer.
 - Render progress reporting, cancellation, subtitle/dialogue-bubble toggle, Save As via Android system file picker, and Android Sharesheet integration.
-- Unit tests for timeline and motion math.
+- Offline PCM WAV timeline mixer with clip offsets, gain, fades, and clipping protection (audio preparation only; not yet muxed into exported MP4).
+- Unit tests for timeline, motion math, and audio mixing.
 
 **Important:** the storyboard generator is a deterministic template system, not an LLM. The current renderer creates stylized placeholder panels from text, not AI artwork. MP4 export is video-only; audio tracks, TTS, SFX/music mixing, project persistence, and real AI model runtimes are not integrated. Export can be saved through Android's system file picker or shared via Sharesheet. The Android encoder pipeline still requires device-level playback testing.
 
@@ -36,7 +37,7 @@ The application does not declare the INTERNET permission and does not call a rem
 
 1. **Validate renderer on devices:** check MP4 playback, output dimensions, timestamps, and encoder compatibility across Android versions.
 2. **Export UX:** validate Save As and Sharesheet on devices; optionally add a MediaStore gallery destination.
-3. **Audio pipeline:** mux dialogue, SFX, ambience, and optional music; validate audio/video duration and clipping.
+3. **Audio pipeline:** connect the PCM mixer to audio import and AAC encoding, mux dialogue/SFX/ambience into MP4, and validate audio/video duration and clipping.
 4. **Local TTS:** choose a runtime/model with Indonesian support and compatible redistribution terms.
 5. **Local LLM adapter:** structured output, JSON validation, retry/repair, cancellation, and model compatibility checks.
 6. **Local image generation adapter:** choose an Android-compatible runtime and model after verifying backend support, memory requirements, and license.
