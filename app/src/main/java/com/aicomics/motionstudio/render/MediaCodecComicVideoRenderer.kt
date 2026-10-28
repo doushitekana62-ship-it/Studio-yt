@@ -85,7 +85,7 @@ class MediaCodecComicVideoRenderer(
             inputSurface = encoder.createInputSurface()
             muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             encoder.start()
-            egl = EglVideoSurface(inputSurface)
+            egl = EglVideoSurface(inputSurface, request.outputWidth, request.outputHeight)
             val gl = egl
             val mux = muxer
             val codec = encoder
@@ -227,7 +227,7 @@ class MediaCodecComicVideoRenderer(
     }
 }
 
-private class EglVideoSurface(surface: Surface) {
+private class EglVideoSurface(surface: Surface, private val width: Int, private val height: Int) {
     private val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
     private val context: android.opengl.EGLContext
     private val eglSurface: android.opengl.EGLSurface
@@ -316,7 +316,7 @@ private class EglVideoSurface(surface: Surface) {
     }
 
     fun draw(texture: Int, scale: Float, x: Float, y: Float, rotation: Float) {
-        GLES20.glViewport(0, 0, 720, 1280)
+        GLES20.glViewport(0, 0, width, height)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(program)
