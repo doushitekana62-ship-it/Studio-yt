@@ -12,6 +12,8 @@ import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.opengl.Matrix
 import android.view.Surface
+import com.aicomics.motionstudio.audio.AudioMp4Pipeline
+import com.aicomics.motionstudio.audio.AudioTimelineMixer
 import com.aicomics.motionstudio.motion.MotionEngine
 import com.aicomics.motionstudio.motion.MotionPreset
 import com.aicomics.motionstudio.storyboard.Scene
@@ -54,8 +56,15 @@ class MediaCodecComicVideoRenderer(
         if (request.framesPerSecond !in 1..60) {
             return@withContext RenderResult.Failure("Frame rate must be between 1 and 60 FPS.")
         }
+        if (request.includeAudio && request.audioSourceFile == null) {
+            return@withContext RenderResult.Failure("Choose a PCM WAV audio file before enabling audio export.")
+        }
+        if (request.includeAudio && request.audioSourceFile?.isFile != true) {
+            return@withContext RenderResult.Failure("The selected audio file is no longer available.")
+        }
 
         val output = File(outputDirectory, "comic_motion_${System.currentTimeMillis()}.mp4")
+        val videoOnlyOutput = File(outputDirectory, "${output.nameWithoutExtension}_video_tmp.mp4")
         var encoder: MediaCodec? = null
         var inputSurface: Surface? = null
         var egl: EglVideoSurface? = null
@@ -83,7 +92,7 @@ class MediaCodecComicVideoRenderer(
             val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { encoder = it }
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             val encoderSurface = codec.createInputSurface().also { inputSurface = it }
-            val mux = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).also { muxer = it }
+            val mux = MediaMuxer(videoOnlyOutput.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).also { muxer = it }
             codec.start()
             val gl = EglVideoSurface(encoderSurface, request.outputWidth, request.outputHeight).also { egl = it }
 
@@ -139,16 +148,46 @@ class MediaCodecComicVideoRenderer(
                 if (drain.muxerStarted) muxerStarted = true
                 outputEos = drain.outputEos
             }
-            if (!muxerStarted || !output.exists() || output.length() <= 0L) {
+            if (!muxerStarted || !videoOnlyOutput.exists() || videoOnlyOutput.length() <= 0L) {
                 return@withContext RenderResult.Failure("Encoder did not produce a valid MP4 stream.")
             }
-            onProgress(RenderProgress(RenderStage.COMPLETED, totalFrames, totalFrames, "Video export complete"))
+            if (request.includeAudio) {
+                // Close the video-only muxer before opening its track for remuxing.
+                runCatching { muxer?.stop() }
+                runCatching { muxer?.release() }
+                muxer = null
+                muxerStarted = false
+                val pcmWav = File(outputDirectory, "${output.nameWithoutExtension}_mix_tmp.wav")
+                try {
+                    onProgress(RenderProgress(RenderStage.MIXING_AUDIO, 0, 100, "Preparing audio timeline"))
+                    AudioTimelineMixer().mix(
+                        clips = listOf(AudioTimelineMixer.Clip(file = request.audioSourceFile!!, startMilliseconds = 0)),
+                        outputFile = pcmWav,
+                        durationMilliseconds = request.storyboard.totalDurationSeconds * 1_000L
+                    ) { fraction ->
+                        onProgress(RenderProgress(RenderStage.MIXING_AUDIO, (fraction * 100).toLong(), 100, "Mixing audio"))
+                    }
+                    onProgress(RenderProgress(RenderStage.FINALIZING, message = "Encoding AAC and muxing MP4"))
+                    AudioMp4Pipeline().encodeAndMux(videoOnlyOutput, pcmWav, output)
+                } finally {
+                    pcmWav.delete()
+                    videoOnlyOutput.delete()
+                }
+            } else {
+                if (!videoOnlyOutput.renameTo(output)) {
+                    videoOnlyOutput.copyTo(output, overwrite = true)
+                    videoOnlyOutput.delete()
+                }
+            }
+            onProgress(RenderProgress(RenderStage.COMPLETED, totalFrames, totalFrames, "MP4 export complete"))
             RenderResult.Success(output.absolutePath, request.storyboard.totalDurationSeconds * 1_000L)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             output.delete()
+            videoOnlyOutput.delete()
             RenderResult.Cancelled
         } catch (error: Throwable) {
             output.delete()
+            videoOnlyOutput.delete()
             RenderResult.Failure(error.message ?: error.javaClass.simpleName)
         } finally {
             runCatching { egl?.release() }
