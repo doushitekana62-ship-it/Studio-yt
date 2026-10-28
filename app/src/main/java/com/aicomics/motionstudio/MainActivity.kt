@@ -46,6 +46,8 @@ import com.aicomics.motionstudio.render.RenderStage
 import com.aicomics.motionstudio.storyboard.Storyboard
 import com.aicomics.motionstudio.storyboard.StoryboardViewModel
 import com.aicomics.motionstudio.ui.StudioTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -71,6 +73,7 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
     val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf("") }
     var isRendering by remember { mutableStateOf(false) }
+    var renderJob by remember { mutableStateOf<Job?>(null) }
     var renderMessage by remember { mutableStateOf("") }
     var exportPath by remember { mutableStateOf<String?>(null) }
     val saveExportLauncher = rememberLauncherForActivityResult(
@@ -184,58 +187,71 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     }
                 }
             }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isRendering,
-                onClick = {
-                    val (width, height) = when (state.aspectRatio) {
-                        "16:9" -> 1280 to 720
-                        "1:1" -> 720 to 720
-                        else -> 720 to 1280
-                    }
-                    val storyboard = Storyboard(
-                        title = "Untitled Comic Story",
-                        prompt = prompt,
-                        totalDurationSeconds = 30,
-                        aspectRatio = state.aspectRatio,
-                        scenes = state.scenes
-                    )
-                    isRendering = true
-                    exportPath = null
-                    renderMessage = "Preparing local H.264 export..."
-                    scope.launch {
-                        val renderer = MediaCodecComicVideoRenderer(context)
-                        val result = renderer.render(
-                            RenderRequest(
-                                storyboard = storyboard,
-                                outputWidth = width,
-                                outputHeight = height,
-                                framesPerSecond = 24,
-                                includeSubtitles = true,
-                                includeAudio = false
-                            )
-                        ) { progress: RenderProgress ->
-                            renderMessage = when (progress.stage) {
-                                RenderStage.RENDERING_VIDEO -> {
-                                    val percent = progress.fraction?.let { "${(it * 100).toInt()}%" } ?: "working"
-                                    "${progress.message} · $percent"
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = !isRendering,
+                    onClick = {
+                        val (width, height) = when (state.aspectRatio) {
+                            "16:9" -> 1280 to 720
+                            "1:1" -> 720 to 720
+                            else -> 720 to 1280
+                        }
+                        val storyboard = Storyboard(
+                            title = "Untitled Comic Story",
+                            prompt = prompt,
+                            totalDurationSeconds = 30,
+                            aspectRatio = state.aspectRatio,
+                            scenes = state.scenes
+                        )
+                        isRendering = true
+                        exportPath = null
+                        renderMessage = "Preparing local H.264 export..."
+                        renderJob = scope.launch {
+                            try {
+                                val renderer = MediaCodecComicVideoRenderer(context)
+                                val result = renderer.render(
+                                    RenderRequest(
+                                        storyboard = storyboard,
+                                        outputWidth = width,
+                                        outputHeight = height,
+                                        framesPerSecond = 24,
+                                        includeSubtitles = true,
+                                        includeAudio = false
+                                    )
+                                ) { progress: RenderProgress ->
+                                    renderMessage = when (progress.stage) {
+                                        RenderStage.RENDERING_VIDEO -> {
+                                            val percent = progress.fraction?.let { "${(it * 100).toInt()}%" } ?: "working"
+                                            "${progress.message} · $percent"
+                                        }
+                                        else -> progress.message.ifBlank { progress.stage.name }
+                                    }
                                 }
-                                else -> progress.message.ifBlank { progress.stage.name }
+                                when (result) {
+                                    is RenderResult.Success -> {
+                                        exportPath = result.outputPath
+                                        renderMessage = "MP4 created. Duration: ${result.durationMilliseconds / 1000}s. File is in app-private storage."
+                                    }
+                                    is RenderResult.Failure -> renderMessage = "Export failed: ${result.reason}"
+                                    RenderResult.Cancelled -> renderMessage = "Export cancelled."
+                                }
+                            } catch (_: CancellationException) {
+                                renderMessage = "Export cancelled."
+                            } finally {
+                                isRendering = false
+                                renderJob = null
                             }
                         }
-                        isRendering = false
-                        when (result) {
-                            is RenderResult.Success -> {
-                                exportPath = result.outputPath
-                                renderMessage = "MP4 created. Duration: ${result.durationMilliseconds / 1000}s. File is in app-private storage."
-                            }
-                            is RenderResult.Failure -> renderMessage = "Export failed: ${result.reason}"
-                            RenderResult.Cancelled -> renderMessage = "Export cancelled."
-                        }
+                    }
+                ) {
+                    Text(if (isRendering) "Rendering..." else "Export comic motion MP4")
+                }
+                if (isRendering) {
+                    Button(onClick = { renderJob?.cancel() }) {
+                        Text("Cancel")
                     }
                 }
-            ) {
-                Text(if (isRendering) "Rendering..." else "Export comic motion MP4")
             }
         }
 
