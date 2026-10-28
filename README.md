@@ -26,6 +26,8 @@ This repository currently contains the initial application scaffold:
 
 Open the project in Android Studio and sync Gradle. The Gradle wrapper JAR is not committed in this initial scaffold; Android Studio can generate it, or run `gradle wrapper` with a compatible Gradle installation.
 
+A successful GitHub Actions run also uploads `app-debug.apk` as the `ai-comic-motion-studio-debug-apk` artifact for 14 days. Open the run in the Actions tab and download the artifact after the build completes.
+
 ## Offline-first design
 
 The application does not declare the INTERNET permission and does not call a remote AI service. The current template draft works offline. Any future model download feature must be an explicit user action and separate from offline production.
