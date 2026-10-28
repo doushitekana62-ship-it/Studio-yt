@@ -77,8 +77,6 @@ class AudioMp4Pipeline {
                                 inputEos = true
                             } else {
                                 val requested = minOf(buffer.remaining().toLong(), remaining).toInt()
-                                val read = input.read(buffer.arrayOrFallback(requested), 0, 0)
-                                // ByteBuffer input buffers are not guaranteed to expose an array.
                                 val bytes = ByteArray(requested)
                                 val actual = input.read(bytes)
                                 if (actual <= 0) {
@@ -218,5 +216,4 @@ class AudioMp4Pipeline {
         error("WAV data chunk was not found.")
     }
 
-    private fun java.nio.ByteBuffer.arrayOrFallback(size: Int): ByteArray = ByteArray(size)
 }
