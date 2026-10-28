@@ -1,6 +1,12 @@
 package com.aicomics.motionstudio
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +73,22 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
     var isRendering by remember { mutableStateOf(false) }
     var renderMessage by remember { mutableStateOf("") }
     var exportPath by remember { mutableStateOf<String?>(null) }
+    val saveExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("video/mp4")
+    ) { destination: Uri? ->
+        val sourcePath = exportPath
+        if (destination != null && sourcePath != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(destination)?.use { output ->
+                    File(sourcePath).inputStream().use { input -> input.copyTo(output) }
+                } ?: error("Could not open the selected destination.")
+            }.onSuccess {
+                renderMessage = "MP4 saved to the location you selected."
+            }.onFailure { error ->
+                renderMessage = "Save failed: ${error.message ?: "unknown error"}"
+            }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp),
@@ -224,6 +246,30 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     if (exportPath != null) {
                         Spacer(Modifier.height(4.dp))
                         Text("Path: $exportPath", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { saveExportLauncher.launch("comic_motion.mp4") }) {
+                                Text("Save MP4 as…")
+                            }
+                            Button(onClick = {
+                                runCatching {
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        File(exportPath!!)
+                                    )
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "video/mp4"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Share comic motion video"))
+                                }.onFailure { error ->
+                                    renderMessage = "Could not open sharing menu: ${error.message ?: "unknown error"}"
+                                }
+                            }) {
+                                Text("Share")
+                            }
+                        }
                     }
                 }
             }
