@@ -11,9 +11,11 @@ This repository currently contains the initial application scaffold:
 - Offline deterministic storyboard draft templates.
 - Five-scene, 30-second timeline.
 - Timeline validation for gaps, overlaps, invalid ranges, total duration, and aspect ratio.
-- Unit tests for generated timeline validity and gap detection.
+- Deterministic comic-panel placeholder artwork drawn locally with Android Canvas.
+- GLES camera pan/zoom/shake transforms and H.264 MP4 video-only export through Android MediaCodec/MediaMuxer.
+- Export progress callbacks and unit tests for timeline and motion math.
 
-**Important:** the current storyboard generator is a deterministic template system, not an LLM. Image generation, TTS, sound mixing, motion rendering, and MP4 export are not yet implemented. Do not treat the prototype as a completed AI video generator.
+**Important:** the storyboard generator is a deterministic template system, not an LLM. The current renderer creates stylized placeholder panels from text, not AI artwork. MP4 export is video-only; audio tracks, TTS, SFX/music mixing, gallery saving/sharing, project persistence, and real AI model runtimes are not integrated. The Android encoder pipeline still requires device-level playback testing.
 
 ## Requirements
 
@@ -29,13 +31,13 @@ The application does not declare the INTERNET permission and does not call a rem
 
 ## Planned implementation order
 
-1. **Comic motion renderer:** scene timeline, camera pan/zoom, shake, transitions, layered images, and preview.
-2. **MP4 export:** stream frames through a bounded-memory pipeline, encode H.264/AAC where supported, validate output duration and playback.
-3. **Local TTS and audio timeline:** select a runtime/model with Indonesian support and compatible redistribution terms; mix dialogue, SFX, ambience, and optional music.
-4. **Local LLM adapter:** structured output, JSON validation, retry/repair, cancellation, and model compatibility checks.
-5. **Local image generation adapter:** select an Android-compatible runtime and model only after verifying backend support, memory requirements, and license.
-6. **Model manager, project persistence, recovery, and device profiling.**
-7. **Device testing and privacy/license documentation.**
+1. **Validate renderer on devices:** check MP4 playback, output dimensions, timestamps, and encoder compatibility across Android versions.
+2. **Export UX:** save to user-selected location or gallery and share through Android Sharesheet.
+3. **Audio pipeline:** mux dialogue, SFX, ambience, and optional music; validate audio/video duration and clipping.
+4. **Local TTS:** choose a runtime/model with Indonesian support and compatible redistribution terms.
+5. **Local LLM adapter:** structured output, JSON validation, retry/repair, cancellation, and model compatibility checks.
+6. **Local image generation adapter:** choose an Android-compatible runtime and model after verifying backend support, memory requirements, and license.
+7. **Model manager, project persistence, recovery, device profiling, and device tests.**
 
 ## Architecture principles
 
