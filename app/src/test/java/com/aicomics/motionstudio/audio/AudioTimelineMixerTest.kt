@@ -16,7 +16,7 @@ class AudioTimelineMixerTest {
         val second = File(directory, "second.wav")
         val output = File(directory, "mix.wav")
         try {
-            writeWav(first, listOf(10_000, 10_000, 10_000, 10_000))
+            writeWav(first, List(4_000) { 10_000 })
             writeWav(second, listOf(5_000, 5_000))
             val result = AudioTimelineMixer(sampleRate = 8_000, channels = 1).mix(
                 clips = listOf(
