@@ -76,6 +76,27 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
     var renderJob by remember { mutableStateOf<Job?>(null) }
     var renderMessage by remember { mutableStateOf("") }
     var exportPath by remember { mutableStateOf<String?>(null) }
+    var selectedAudioFile by remember { mutableStateOf<File?>(null) }
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { sourceUri: Uri? ->
+        if (sourceUri != null) {
+            runCatching {
+                val audioDirectory = File(context.filesDir, "audio-imports").apply { mkdirs() }
+                val destination = File(audioDirectory, "audio_${System.currentTimeMillis()}.wav")
+                context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                    destination.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("Could not read the selected audio file.")
+                destination
+            }.onSuccess {
+                selectedAudioFile = it
+                renderMessage = "Audio selected: ${it.name}. Use an uncompressed 16-bit PCM WAV file at 48 kHz stereo."
+            }.onFailure { error ->
+                renderMessage = "Audio import failed: ${error.message ?: "unknown error"}"
+            }
+        }
+    }
+
     val saveExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("video/mp4")
     ) { destination: Uri? ->
@@ -187,6 +208,29 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     }
                 }
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = !isRendering,
+                    onClick = { audioPickerLauncher.launch(arrayOf("audio/wav", "audio/x-wav")) }
+                ) {
+                    Text(if (selectedAudioFile == null) "Choose WAV audio" else "Change WAV audio")
+                }
+                if (selectedAudioFile != null) {
+                    Button(
+                        enabled = !isRendering,
+                        onClick = { selectedAudioFile = null }
+                    ) {
+                        Text("Remove")
+                    }
+                }
+            }
+            if (selectedAudioFile != null) {
+                Text("Audio bed: ${selectedAudioFile!!.name}", style = MaterialTheme.typography.bodySmall)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     modifier = Modifier.weight(1f),
@@ -217,7 +261,8 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                                         outputHeight = height,
                                         framesPerSecond = 24,
                                         includeSubtitles = true,
-                                        includeAudio = false
+                                        includeAudio = selectedAudioFile != null,
+                                        audioSourceFile = selectedAudioFile
                                     )
                                 ) { progress: RenderProgress ->
                                     renderMessage = when (progress.stage) {
@@ -292,7 +337,7 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
         }
 
         Text(
-            "Export creates generated placeholder comic panels with camera motion and H.264 video only. Save-as and Android sharing are available; AI image generation, voice, audio mixing, and gallery integration are not included yet.",
+            "Export creates generated placeholder comic panels with camera motion. Optional audio export currently accepts 16-bit PCM WAV at 48 kHz stereo; AAC audio is muxed into MP4. AI image generation, voice synthesis, and gallery integration are not included yet.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
