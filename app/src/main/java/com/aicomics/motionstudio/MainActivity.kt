@@ -276,7 +276,7 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
         }
 
         Text(
-            "Export currently creates generated placeholder comic panels with camera motion and H.264 video only. AI image generation, voice, audio mixing, gallery saving, and sharing are not integrated.",
+            "Export creates generated placeholder comic panels with camera motion and H.264 video only. Save-as and Android sharing are available; AI image generation, voice, audio mixing, and gallery integration are not included yet.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
