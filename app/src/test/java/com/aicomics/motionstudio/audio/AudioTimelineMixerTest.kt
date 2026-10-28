@@ -24,14 +24,14 @@ class AudioTimelineMixerTest {
                     AudioTimelineMixer.Clip(second, startMilliseconds = 250, gain = 1f)
                 ),
                 outputFile = output,
-                durationMilliseconds = 500
+                durationMilliseconds = 750
             )
             val samples = readSamples(output)
-            assertEquals(500L, result.durationMilliseconds)
-            assertEquals(4_000, samples.size)
+            assertEquals(750L, result.durationMilliseconds)
+            assertEquals(6_000, samples.size)
             assertEquals(10_000, samples[0])
             assertEquals(15_000, samples[2_000])
-            assertEquals(0, samples[3_999])
+            assertEquals(0, samples[5_999])
         } finally {
             directory.deleteRecursively()
         }
