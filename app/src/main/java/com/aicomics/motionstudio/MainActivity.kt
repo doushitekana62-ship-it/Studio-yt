@@ -3,7 +3,6 @@ package com.aicomics.motionstudio
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,18 +22,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.AssistChip
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aicomics.motionstudio.render.MediaCodecComicVideoRenderer
+import com.aicomics.motionstudio.render.RenderProgress
+import com.aicomics.motionstudio.render.RenderRequest
+import com.aicomics.motionstudio.render.RenderResult
+import com.aicomics.motionstudio.render.RenderStage
+import com.aicomics.motionstudio.storyboard.Storyboard
 import com.aicomics.motionstudio.storyboard.StoryboardViewModel
 import com.aicomics.motionstudio.ui.StudioTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +61,12 @@ class MainActivity : ComponentActivity() {
 @androidx.compose.runtime.Composable
 private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
     val state by viewModel.state
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf("") }
+    var isRendering by remember { mutableStateOf(false) }
+    var renderMessage by remember { mutableStateOf("") }
+    var exportPath by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp),
@@ -84,7 +96,7 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     value = prompt,
                     onValueChange = { prompt = it },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
+                    minLines = 3,
                     label = { Text("Describe your story") },
                     placeholder = { Text("A swordsman protects a futuristic city from an energy monster...") }
                 )
@@ -94,7 +106,11 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     AssistChip(onClick = { viewModel.setAspectRatio("1:1") }, label = { Text("1:1") })
                 }
                 Button(
-                    onClick = { viewModel.createDraft(prompt) },
+                    onClick = {
+                        exportPath = null
+                        renderMessage = ""
+                        viewModel.createDraft(prompt)
+                    },
                     enabled = prompt.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -120,12 +136,12 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                 Column(Modifier.padding(16.dp)) {
                     Text("No storyboard yet", fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
-                    Text("Enter a prompt to create a local template draft. This initial version does not call an AI model.")
+                    Text("Create a draft to review the scene timeline. Story content is currently generated from offline templates, not an AI model.")
                 }
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f, fill = true),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(state.scenes, key = { it.id }) { scene ->
@@ -146,10 +162,75 @@ private fun StudioHome(viewModel: StoryboardViewModel = viewModel()) {
                     }
                 }
             }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isRendering,
+                onClick = {
+                    val (width, height) = when (state.aspectRatio) {
+                        "16:9" -> 1280 to 720
+                        "1:1" -> 720 to 720
+                        else -> 720 to 1280
+                    }
+                    val storyboard = Storyboard(
+                        title = "Untitled Comic Story",
+                        prompt = prompt,
+                        totalDurationSeconds = 30,
+                        aspectRatio = state.aspectRatio,
+                        scenes = state.scenes
+                    )
+                    isRendering = true
+                    exportPath = null
+                    renderMessage = "Preparing local H.264 export..."
+                    scope.launch {
+                        val renderer = MediaCodecComicVideoRenderer(context)
+                        val result = renderer.render(
+                            RenderRequest(
+                                storyboard = storyboard,
+                                outputWidth = width,
+                                outputHeight = height,
+                                framesPerSecond = 24,
+                                includeSubtitles = true,
+                                includeAudio = false
+                            )
+                        ) { progress: RenderProgress ->
+                            renderMessage = when (progress.stage) {
+                                RenderStage.RENDERING_VIDEO -> {
+                                    val percent = progress.fraction?.let { "${(it * 100).toInt()}%" } ?: "working"
+                                    "${progress.message} · $percent"
+                                }
+                                else -> progress.message.ifBlank { progress.stage.name }
+                            }
+                        }
+                        isRendering = false
+                        when (result) {
+                            is RenderResult.Success -> {
+                                exportPath = result.outputPath
+                                renderMessage = "MP4 created. Duration: ${result.durationMilliseconds / 1000}s. File is in app-private storage."
+                            }
+                            is RenderResult.Failure -> renderMessage = "Export failed: ${result.reason}"
+                            RenderResult.Cancelled -> renderMessage = "Export cancelled."
+                        }
+                    }
+                }
+            ) {
+                Text(if (isRendering) "Rendering..." else "Export comic motion MP4")
+            }
+        }
+
+        if (renderMessage.isNotBlank()) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                    Text(renderMessage, style = MaterialTheme.typography.bodyMedium)
+                    if (exportPath != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Path: $exportPath", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
         }
 
         Text(
-            "Prototype status: storyboard templates only. Image generation, voice, audio mixing, and MP4 export are not integrated yet.",
+            "Export currently creates generated placeholder comic panels with camera motion and H.264 video only. AI image generation, voice, audio mixing, gallery saving, and sharing are not integrated.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
