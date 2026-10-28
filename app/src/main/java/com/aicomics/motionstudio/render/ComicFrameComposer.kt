@@ -12,7 +12,7 @@ import com.aicomics.motionstudio.storyboard.Scene
  * This is a local placeholder visual, not AI-generated artwork.
  */
 class ComicFrameComposer {
-    fun compose(scene: Scene, width: Int, height: Int, sceneIndex: Int): Bitmap {
+    fun compose(scene: Scene, width: Int, height: Int, sceneIndex: Int, includeDialogue: Boolean = true): Bitmap {
         require(width > 0 && height > 0)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -81,7 +81,7 @@ class ComicFrameComposer {
             maxLines = 4
         )
 
-        if (scene.dialogue.isNotBlank()) {
+        if (includeDialogue && scene.dialogue.isNotBlank()) {
             val bubble = RectF(width * 0.06f, height * 0.84f, width * 0.94f, height * 0.96f)
             val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(235, 250, 250, 255)
