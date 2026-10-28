@@ -91,7 +91,7 @@ class MediaCodecComicVideoRenderer(
 
             request.storyboard.scenes.forEachIndexed { sceneIndex, scene ->
                 currentCoroutineContext().ensureActive()
-                val bitmap = composer.compose(scene, request.outputWidth, request.outputHeight, sceneIndex)
+                val bitmap = composer.compose(scene, request.outputWidth, request.outputHeight, sceneIndex, request.includeSubtitles)
                 try {
                     val texture = gl.uploadTexture(bitmap)
                     val preset = presetFor(scene.cameraMotion)
